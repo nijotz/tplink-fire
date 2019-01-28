@@ -1,6 +1,7 @@
 const TPLSmartDevice = require('tplink-lightbulb')
 const perlin = require('perlin-noise')
 
+const log = false
 const light = new TPLSmartDevice('192.168.0.32')
 const width = 1024
 const height = 1024
@@ -60,8 +61,10 @@ async function run() {
         light.power(true, transition, {color_temp: 0, hue, saturation, brightness}),
         sleep(100)
       ])
-      console.log(`{x: ${x}, y: ${y}}`)
-      console.log(status)
+      if (log) {
+        console.log(`{x: ${x}, y: ${y}}`)
+        console.log(status)
+      }
     } catch (err) {
       console.error(err)
     }
