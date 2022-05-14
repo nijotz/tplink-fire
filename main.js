@@ -1,75 +1,63 @@
 const TPLSmartDevice = require('tplink-lightbulb')
-const perlin = require('perlin-noise')
+const SimplexNoise = require('simplex-noise')
 
-const log = false
-const light = new TPLSmartDevice('192.168.0.32')
-const width = 1024
-const height = 1024
-const colorNoise = perlin.generatePerlinNoise(width, height)
-const brightnessNoise = perlin.generatePerlinNoise(width, height)
+const log = true
+const ips = [
+  '192.168.1.2',
+  '192.168.1.4',
+  '192.168.1.5',
+  '192.168.1.9',
+  '192.168.1.10',
+  '192.168.1.11'
+]
+const lights = ips.map((ip) => new TPLSmartDevice(ip))
+const speed = 0.035
+const colorNoise = new SimplexNoise()
+const brightnessNoise = new SimplexNoise()
 
-let transition = 0
-let hue = 0
-let saturation = 100
-let brightness = 0
-
-function sleep(ms) {
+async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function run() {
-  let x = 0
-  let y = 0
-  let xdir = 1
-  let ydir = 1
+  let z = 0
 
   while (true) {
-    // Move through a 2D array like a snake
+    // Controls "flicker", how quickly this moves through the noise pattern
+    z = z + speed
 
-    x = x + xdir         // Move forward one step
-    if (x >= width) {    // Check if we're out of bounds on the right
-      x = width - 1      // Step back in bounds
-      y = y + ydir       // Change rows
-      xdir = -1          // Change direction
+    let noisey = (array, noise, coeff) => {
+      values = array.map((_, i) => noise.noise3D(i, 0.5, z))
+      values = values.map(x => Math.abs(x) * coeff)
+      values = values.map(x => parseInt(x))
+      return values
     }
 
-    if (x < 0) {         // Check if we're out of bounds on the left
-      x = 0              // Step back in bounds
-      y = y + ydir       // Change rows
-      xdir = 1           // Change direction
-    }
+    // 29 is upper limit, library uses 0-100, 0-29 is red to yellow spectrum
+    let hues = noisey(lights, colorNoise, 29.)
+    let brightnesses = noisey(lights, brightnessNoise, 100.)
 
-    if (y >= height) {   // Check if we're out of bounds on the bottom
-      y = height - 1     // Step back in bounds
-      ydir = -1          // Change direction
-    }
-    if (y < 0) {         // Check if we're out of bounds on the top
-      y = 0              // Step back in bounds
-      ydir = 1           // Change direction
-    }
-
-    // Get the array position of the 2d coords
-    let i = y * width + x
-
-    // Hue and brightness based on perlin noise
-    hue = Math.trunc(colorNoise[i] * 29.0)
-    brightness = Math.trunc(brightnessNoise[i] * 100.0)
-
-    // Tell the bulb what to do
+    // Tell the bulbs what to do
     try {
-      let status = await Promise.race([
-        light.power(true, transition, {color_temp: 0, hue, saturation, brightness}),
-        sleep(100)
-      ])
+      let commands = lights.map((light, i) => {
+        let hue = hues[i]
+        let brightness = brightnesses[i]
+        let saturation = 100
+        let transition = 0
+        return light.power(true, transition, {color_temp: 0, hue, saturation, brightness})
+      })
+
+      let status = await Promise.race([Promise.all(commands), sleep(100)])
+
       if (log) {
-        console.log(`{x: ${x}, y: ${y}}`)
+        console.log(`z: ${z}`)
+        console.log('hues', hues)
+        console.log('brightnesses', brightnesses)
         console.log(status)
       }
     } catch (err) {
       console.error(err)
     }
-
-
   }
 }
 

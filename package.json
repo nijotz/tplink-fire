@@ -2,7 +2,7 @@
   "name": "tplink-test",
   "version": "1.0.0",
   "dependencies": {
-    "perlin-noise": "0.0.1",
+    "simplex-noise": "^3.0.1",
     "tplink-lightbulb": "^1.4.2",
     "tplink-smarthome-api": "^1.2.0"
   }
