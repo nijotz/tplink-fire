@@ -1,5 +1,6 @@
 const TPLSmartDevice = require('tplink-lightbulb')
 const SimplexNoise = require('simplex-noise')
+const { point, circle, ray, segment, vector } = require('@flatten-js/core')
 
 const log = true
 const ips = [
@@ -11,13 +12,12 @@ const ips = [
   '192.168.1.5',   // Bulb 6 - 50:C7:BF:03:C1:8B
 ]
 const lights = ips.map((ip) => new TPLSmartDevice(ip))
-const speed = 0.05
 const colorNoise = new SimplexNoise()
 const brightnessNoise = new SimplexNoise()
 const saturationNoise = new SimplexNoise()
 
 async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 const fireOptions = {
@@ -31,16 +31,91 @@ const fireOptions = {
 }
 
 const candleOptions = {
-  speed: 0.05,
+  speed: 0.035,
   hueMin: 22,
   hueMax: 35,
-  brightnessMin: 25,
-  brightnessMax: 75,
-  saturationMin: 65,
-  saturationMax: 90,
+  brightnessMin: 05,
+  brightnessMax: 10,
+  saturationMin: 40,
+  saturationMax: 60,
 }
 
-async function run(options) {
+const brightOptions = {
+  speed: 0.035,
+  hueMin: 30,
+  hueMax: 30,
+  brightnessMin: 100,
+  brightnessMax: 100,
+  saturationMin: 40,
+  saturationMax: 40,
+}
+
+async function rgb() {
+  const speed = 1.0 / (2.0 * 1000)            // Rotations per millisecond
+  const sleep_ms = 100                         // Milliseconds between loops
+  const hue_max = 360.0
+  const hue_delta = hue_max * sleep_ms * speed // Change in hue per loop
+  const hue_spread = hue_max / lights.length   // Change in hue angle from light to light
+  const center = {                             // All hues average to this point on the HSV circle
+    hue: 60.0,
+    sat: 50.0
+  }
+  const center_x = Math.cos(center.hue * Math.PI / 180) * center.sat
+  const center_y = Math.sin(center.hue * Math.PI / 180) * center.sat
+
+  const hue_circle = circle(point(0, 0), 100);
+
+  let starting_hue = 0.0
+
+  while (true) {
+    try {
+      starting_hue += hue_delta
+      starting_hue %= hue_max
+
+      commands = lights.map((light, i) => {
+        // Get the angle of this bulb's hue
+        let angle = (starting_hue + (i * hue_spread)) % hue_max
+
+        // Create a segment that goes from the color center out at the angle
+        // The circle is radius 100 (the saturation), a line of 200 will intersect
+        let segment_end = point(
+          center_x + Math.cos(angle * Math.PI / 180) * 200,
+          center_y + Math.sin(angle * Math.PI / 180) * 200)
+
+        // Find where on the hue circle that segment intersects
+        let s = segment(point(center_x, center_y), segment_end)
+        let intersection = s.intersect(hue_circle)[0]
+
+        // Convert intersection coordinates to hue angle to get new hue
+        let hue = Math.atan2(intersection.y, intersection.x) * 180.0 / Math.PI
+
+        // Convert negative degrees to positive
+        hue = parseInt((360 + hue) % 360)
+        let saturation = 100
+        let brightness = 100
+
+        if (log) { console.log(`hue ${i}`, hue) }
+
+        return light.power(true, sleep_ms, {color_temp: 0, hue, saturation, brightness})
+      })
+
+      // Run all the commands and sleep, but don't let the commands go over too long
+      let status = await Promise.race([
+        Promise.all([...commands, sleep(sleep_ms)]),
+        sleep(sleep_ms + 50)
+      ])
+
+      if (log) {
+        console.log('hue', starting_hue)
+        console.log('status', status)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+}
+
+async function flicker(options) {
   let z = 0
 
   while (true) {
@@ -83,4 +158,6 @@ async function run(options) {
   }
 }
 
-run(candleOptions)
+//flicker(brightOptions)
+//flicker(candleOptions)
+rgb()
