@@ -3,12 +3,12 @@ const SimplexNoise = require('simplex-noise')
 
 const log = true
 const ips = [
-  '192.168.1.2',
-  '192.168.1.4',
-  '192.168.1.5',
-  '192.168.1.9',
-  '192.168.1.10',
-  '192.168.1.11'
+  '192.168.1.7',   // Bulb 1 - 50:C7:BF:3C:0C:C9
+  '192.168.1.6',   // Bulb 2 - 50:C7:BF:3A:0F:0A
+  '192.168.1.2',   // Bulb 3 - 50:C7:BF:3A:13:D7
+  '192.168.1.4',   // Bulb 4 - 50:C7:BF:3C:19:4A
+  '192.168.1.3',   // Bulb 5 - 50:C7:BF:40:73:39
+  '192.168.1.5',   // Bulb 6 - 50:C7:BF:03:C1:8B
 ]
 const lights = ips.map((ip) => new TPLSmartDevice(ip))
 const speed = 0.05
